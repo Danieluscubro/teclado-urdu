@@ -410,7 +410,9 @@
     recogAvailable = true;
     recognition.interimResults = true;
     recognition.continuous = true;
-    recognition.lang = micLangSel?.value || 'ur-PK';
+    // Mapeo de idioma para mayor compatibilidad (ur-PK → ur)
+    function mapMicLang(lang) { return !lang ? 'ur' : (lang === 'ur-PK' ? 'ur' : lang); }
+    recognition.lang = mapMicLang(micLangSel?.value) || 'ur';
   } else {
     micStatus.textContent = 'El reconocimiento de voz no está soportado en este navegador.';
     if (micStartBtn) micStartBtn.disabled = true;
@@ -419,7 +421,7 @@
   function startMic() {
     if (!recogAvailable || !recognition || isRecognizing) return;
     try {
-      recognition.lang = micLangSel.value;
+      recognition.lang = (typeof mapMicLang === 'function') ? mapMicLang(micLangSel.value) : micLangSel.value;
       recognition.start();
     } catch (e) {
       console.error(e);
@@ -485,8 +487,11 @@
         const lang = micLangSel.value;
         const clean = finalText.trim();
         if (lang.startsWith('ur')) {
+          // Si el resultado viene en latino (roman urdu), transliterar a urdú
+          const hasArabic = /[\u0600-\u06FF]/.test(clean);
+          const urText = hasArabic ? clean : transliterateLatinToUrdu(clean);
           const start = urduInput.value.length;
-          urduInput.value = (urduInput.value ? urduInput.value + ' ' : '') + clean;
+          urduInput.value = (urduInput.value ? urduInput.value + ' ' : '') + urText;
           const caret = urduInput.value.length;
           urduInput.setSelectionRange(caret, caret);
           if (micBothToggle?.checked) {

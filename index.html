@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teclado en Urdú con Traducción</title>
+    <meta name="description" content="Teclado virtual en urdú y traducción bidireccional urdú↔español." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Urdú ↔ Español</h1>
+      <p class="subtitle">Escribe o dicta y traduce entre urdú y castellano.</p>
+    </header>
+
+    <div class="toolbar">
+      <div class="controls">
+        <label class="toggle">
+          <span>Dirección</span>
+          <select id="directionSel" class="select">
+            <option value="ur-es" selected>Urdú → Español</option>
+            <option value="es-ur">Español → Urdú</option>
+          </select>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="autoTranslate" checked />
+          <span>Traducción automática</span>
+        </label>
+        <button id="translateBtn" class="btn">Traducir ahora</button>
+        <button id="clearBtn" class="btn btn--secondary">Limpiar</button>
+        <button id="copyBtn" class="btn">Copiar</button>
+        <button id="speakBtn" class="btn">Escuchar resultado</button>
+        <button id="speakStopBtn" class="btn btn--secondary" disabled>Detener voz</button>
+      </div>
+    </div>
+
+    <main class="container">
+      <section class="pane pane--urdu">
+        <label for="urduInput" class="label">Texto en urdú</label>
+        <textarea id="urduInput" class="textarea textarea--urdu" dir="rtl" lang="ur" placeholder="ٹیکسٹ یہاں لکھیں (Escribe aquí en urdú)"></textarea>
+        <div class="controls">
+          <label class="toggle">
+            <input type="checkbox" id="translitToggle" />
+            <span>Transliteración (teclado latino → urdú)</span>
+          </label>
+        </div>
+        <div id="keyboard" class="keyboard" aria-label="Teclado virtual en urdú"></div>
+        <div class="mic" aria-label="Controles de micrófono">
+          <div class="controls">
+            <label class="toggle">
+              <span>Micrófono</span>
+              <select id="micLang" class="select">
+                <option value="ur-PK" selected>Urdú (ur-PK)</option>
+                <option value="es-ES">Español (es-ES)</option>
+              </select>
+            </label>
+            <button id="micStartBtn" class="btn">Empezar a hablar</button>
+            <button id="micStopBtn" class="btn btn--secondary" disabled>Detener</button>
+          </div>
+          <details class="advanced">
+            <summary>Opciones avanzadas</summary>
+            <div class="controls">
+              <label class="toggle">
+                <input type="checkbox" id="micBoth" />
+                <span>Dictar a ambas salidas</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="micAutoEs2Ur" checked />
+                <span>Auto-traducir dictado español a urdú</span>
+              </label>
+            </div>
+          </details>
+          <div id="micStatus" class="status"></div>
+        </div>
+      </section>
+
+      <section class="pane pane--es">
+        <label for="spanishOutput" class="label">Traducción al español</label>
+        <div id="status" class="status">Escribe en urdú para ver la traducción…</div>
+        <textarea id="spanishOutput" class="textarea" dir="ltr" lang="es" readonly placeholder="La traducción aparecerá aquí"></textarea>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>
+        Nota: La traducción usa servicios públicos (MyMemory/LibreTranslate) y puede estar limitada.
+      </small>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

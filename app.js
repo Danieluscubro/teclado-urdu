@@ -545,11 +545,11 @@
       if (finalText) {
         const lang = recognition.lang || lastRecogLang || micLangSel.value;
         const clean = finalText.trim();
-        if (lang.startsWith('ur')) {
-          // Si el resultado viene en latino (roman urdu), transliterar a urdú
+        const urToEs = isUrduToSpanish();
+        if (urToEs) {
           const hasArabic = /[\u0600-\u06FF]/.test(clean);
-          const urText = hasArabic ? clean : transliterateLatinToUrdu(clean);
-          const start = urduInput.value.length;
+          const treatAsUrduScript = hasArabic || (lang && (lang.startsWith('ur') || lang.startsWith('fa') || lang.startsWith('ar')));
+          const urText = treatAsUrduScript ? clean : transliterateLatinToUrdu(clean);
           urduInput.value = (urduInput.value ? urduInput.value + ' ' : '') + urText;
           const caret = urduInput.value.length;
           urduInput.setSelectionRange(caret, caret);
@@ -564,9 +564,10 @@
               statusEl.textContent = 'Error al traducir (micrófono)';
             }
           } else {
-            if (isUrduToSpanish()) scheduleTranslate();
+            scheduleTranslate();
           }
         } else {
+          // Español → Urdú: agrega al cuadro español y traduce opcionalmente
           spanishOutput.value = (spanishOutput.value ? spanishOutput.value + ' ' : '') + clean;
           if (micBothToggle?.checked) {
             if (micAutoEs2UrToggle?.checked) {
@@ -588,7 +589,7 @@
               urduInput.setSelectionRange(caret2, caret2);
             }
           } else {
-            if (!isUrduToSpanish()) scheduleTranslate();
+            scheduleTranslate();
           }
         }
         micStatus.textContent = 'Transcripción añadida';

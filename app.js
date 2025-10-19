@@ -408,6 +408,8 @@
   let micFallbackIndex = 0;
   const urduFallbackOrder = ['ur-PK', 'ur', 'ur-IN', 'fa-IR', 'ar-SA', 'en-US'];
   let lastRecogLang = '';
+  let micUserRequestedStop = false;
+  let micAutoRestart = true;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     recognition = new SR();
@@ -433,6 +435,7 @@
         recognition.lang = (typeof mapMicLang === 'function') ? mapMicLang(micLangSel.value) : micLangSel.value;
       }
       lastRecogLang = recognition.lang;
+      micUserRequestedStop = false;
       recognition.start();
     } catch (e) {
       console.error(e);
@@ -443,6 +446,7 @@
   function stopMic() {
     if (!recogAvailable || !recognition || !isRecognizing) return;
     try {
+      micUserRequestedStop = true;
       recognition.stop();
     } catch (e) {
       console.error(e);
@@ -474,6 +478,13 @@
 
     recognition.onend = () => {
       isRecognizing = false;
+      if (micAutoRestart && !micUserRequestedStop) {
+        micStatus.textContent = 'Reconectando escucha…';
+        micStartBtn.disabled = true;
+        micStopBtn.disabled = false;
+        setTimeout(startMic, 250);
+        return;
+      }
       micStatus.textContent = 'Micrófono detenido';
       micStartBtn.disabled = false;
       micStopBtn.disabled = true;
@@ -508,6 +519,7 @@
             ? 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.'
             : `Reconocimiento urdú no disponible; probando fallback ${nextLang}.`;
           try {
+            micUserRequestedStop = false;
             stopMic();
             recognition.lang = nextLang;
             lastRecogLang = nextLang;
@@ -519,6 +531,13 @@
         }
       } else {
         micStatus.textContent = 'Error en reconocimiento de voz.';
+      }
+      const canRestart = (code === 'no-speech' || code === 'network' || code === 'bad-grammar' || code === 'service-not-allowed' || code === 'language-not-supported');
+      if ((micAutoRestart && !micUserRequestedStop) && (canRestart || micFallbackActive)) {
+        micStartBtn.disabled = true;
+        micStopBtn.disabled = false;
+        setTimeout(startMic, 400);
+        return;
       }
       micStartBtn.disabled = false;
       micStopBtn.disabled = true;

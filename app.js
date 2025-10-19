@@ -406,10 +406,11 @@
   let isRecognizing = false;
   let micFallbackActive = false;
   let micFallbackIndex = 0;
-  const urduFallbackOrder = ['ur-PK', 'ur', 'ur-IN', 'fa-IR', 'ar-SA', 'en-US'];
-  let lastRecogLang = '';
-  let micUserRequestedStop = false;
-  let micAutoRestart = true;
+  const urduFallbackOrder = ["ur-PK", "ur", "ur-IN", "fa-IR", "ar-SA", "en-US"];
+  let lastRecogLang = null;
+  // Añadimos control de reintentos para evitar bucles
+  let micRestartCount = 0;
+  const micRestartLimit = 3;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     recognition = new SR();
@@ -455,7 +456,13 @@
   }
 
   if (recogAvailable) {
-    micStartBtn.addEventListener('click', startMic);
+    micStartBtn.addEventListener('click', () => {
+      // Reinicia estado de fallback y contador de reintentos cuando el usuario inicia
+      micFallbackActive = false;
+      micFallbackIndex = 0;
+      micRestartCount = 0;
+      startMic();
+    });
     micStopBtn.addEventListener('click', stopMic);
     micLangSel.addEventListener('change', () => {
       micFallbackActive = false;
@@ -479,11 +486,16 @@
     recognition.onend = () => {
       isRecognizing = false;
       if (micAutoRestart && !micUserRequestedStop) {
-        micStatus.textContent = 'Reconectando escucha…';
-        micStartBtn.disabled = true;
-        micStopBtn.disabled = false;
-        setTimeout(startMic, 250);
-        return;
+        if (micRestartCount < micRestartLimit) {
+          micRestartCount++;
+          micStatus.textContent = 'Reconectando escucha…';
+          micStartBtn.disabled = true;
+          micStopBtn.disabled = false;
+          setTimeout(startMic, 250);
+          return;
+        } else {
+          micStatus.textContent = 'Micrófono detenido (no se pudo reconectar).';
+        }
       }
       micStatus.textContent = 'Micrófono detenido';
       micStartBtn.disabled = false;
@@ -491,57 +503,47 @@
     };
 
     recognition.onerror = (ev) => {
+      const code = ev && ev.error ? ev.error : 'desconocido';
       console.error('Speech error:', ev);
-      const code = ev?.error;
+      let canRestart = false;
+      // Mensajes detallados con código
       if (code === 'not-allowed') {
-        micStatus.textContent = 'Permiso denegado para micrófono.';
+        micStatus.textContent = 'Permiso denegado para micrófono. (código: not-allowed)';
+        micStartBtn.disabled = false;
+        micStopBtn.disabled = true;
+        micAutoRestart = false;
       } else if (code === 'audio-capture') {
-        micStatus.textContent = 'No se detecta micrófono.';
+        micStatus.textContent = 'No se detecta micrófono. (código: audio-capture)';
+        canRestart = true;
       } else if (code === 'no-speech') {
-        micStatus.textContent = 'No se detectó voz.';
+        micStatus.textContent = 'No se detectó voz. (código: no-speech)';
+        canRestart = true;
       } else if (code === 'network') {
-        micStatus.textContent = 'Error de red del reconocimiento.';
-      } else if ((code === 'language-not-supported' || code === 'bad-grammar' || code === 'service-not-allowed') && micLangSel.value.startsWith('ur')) {
-        // Avanzar por fallbacks: ur-PK → ur → ur-IN → fa-IR → ar-SA → en-US
-        if (!micFallbackActive) {
-          micFallbackActive = true;
-          micFallbackIndex = 1; // siguiente tras seleccionado
-        } else if (micFallbackIndex < urduFallbackOrder.length - 1) {
-          micFallbackIndex++;
-        } else {
-          micFallbackActive = false;
-          micFallbackIndex = 0;
-          micStatus.textContent = 'Error en reconocimiento (sin fallback disponible).';
-        }
-        if (micFallbackActive) {
-          const nextLang = urduFallbackOrder[micFallbackIndex];
-          micStatus.textContent = nextLang === 'en-US'
-            ? 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.'
-            : `Reconocimiento urdú no disponible; probando fallback ${nextLang}.`;
-          try {
-            micUserRequestedStop = false;
-            stopMic();
-            recognition.lang = nextLang;
-            lastRecogLang = nextLang;
-            setTimeout(startMic, 300);
-            return;
-          } catch (e) {
-            console.error(e);
-          }
-        }
+        micStatus.textContent = 'Error de red del reconocimiento. (código: network)';
+        canRestart = true;
+      } else if (code === 'language-not-supported' || code === 'service-not-allowed') {
+        micStatus.textContent = `Servicio/idioma no disponible, intentando fallback… (código: ${code})`;
+        canRestart = true;
       } else {
-        micStatus.textContent = 'Error en reconocimiento de voz.';
+        micStatus.textContent = `Error en reconocimiento de voz. (código: ${code})`;
+        canRestart = true;
       }
-      const canRestart = (code === 'no-speech' || code === 'network' || code === 'bad-grammar' || code === 'service-not-allowed' || code === 'language-not-supported');
+
+      // Auto-reinicio limitado para evitar bucles
       if ((micAutoRestart && !micUserRequestedStop) && (canRestart || micFallbackActive)) {
-        micStartBtn.disabled = true;
-        micStopBtn.disabled = false;
-        setTimeout(startMic, 400);
-        return;
+        if (micRestartCount < micRestartLimit) {
+          micRestartCount++;
+          micStartBtn.disabled = true;
+          micStopBtn.disabled = false;
+          micStatus.textContent += ' → Reconectando…';
+          setTimeout(startMic, 400);
+          return;
+        } else {
+          micStatus.textContent += ' → No se pudo reconectar.';
+          micStartBtn.disabled = false;
+          micStopBtn.disabled = true;
+        }
       }
-      micStartBtn.disabled = false;
-      micStopBtn.disabled = true;
-      isRecognizing = false;
     };
 
     recognition.onnomatch = () => {

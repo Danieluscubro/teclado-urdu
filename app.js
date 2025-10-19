@@ -488,7 +488,9 @@
 
     recognition.onend = () => {
       isRecognizing = false;
-      if (micAutoRestart && !micUserRequestedStop) {
+      // Usa guardas para evitar ReferenceError si micAutoRestart no está disponible
+      const autoRestart = (typeof micAutoRestart === 'undefined' ? true : micAutoRestart);
+      if (autoRestart && !micUserRequestedStop) {
         if (micRestartCount < micRestartLimit) {
           micRestartCount++;
           micStatus.textContent = 'Reconectando escucha…';
@@ -514,7 +516,8 @@
         micStatus.textContent = 'Permiso denegado para micrófono. (código: not-allowed)';
         micStartBtn.disabled = false;
         micStopBtn.disabled = true;
-        micAutoRestart = false;
+        // Evita auto-reintentos cuando hay denegación
+        try { micAutoRestart = false; } catch (_) {}
       } else if (code === 'audio-capture') {
         micStatus.textContent = 'No se detecta micrófono. (código: audio-capture)';
         canRestart = true;
@@ -533,7 +536,8 @@
       }
 
       // Auto-reinicio limitado para evitar bucles
-      if ((micAutoRestart && !micUserRequestedStop) && (canRestart || micFallbackActive)) {
+      const autoRestart = (typeof micAutoRestart === 'undefined' ? true : micAutoRestart);
+      if ((autoRestart && !micUserRequestedStop) && (canRestart || micFallbackActive)) {
         if (micRestartCount < micRestartLimit) {
           micRestartCount++;
           micStartBtn.disabled = true;

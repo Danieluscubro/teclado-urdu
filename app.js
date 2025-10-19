@@ -404,12 +404,14 @@
   let recognition = null;
   let recogAvailable = false;
   let isRecognizing = false;
+  let micFallbackRoman = false;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     recognition = new SR();
     recogAvailable = true;
     recognition.interimResults = true;
     recognition.continuous = true;
+    recognition.maxAlternatives = 1;
     // Mapeo de idioma para mayor compatibilidad (ur-PK → ur)
     function mapMicLang(lang) { return !lang ? 'ur' : (lang === 'ur-PK' ? 'ur' : lang); }
     recognition.lang = mapMicLang(micLangSel?.value) || 'ur';
@@ -421,7 +423,11 @@
   function startMic() {
     if (!recogAvailable || !recognition || isRecognizing) return;
     try {
-      recognition.lang = (typeof mapMicLang === 'function') ? mapMicLang(micLangSel.value) : micLangSel.value;
+      if (micFallbackRoman) {
+        recognition.lang = 'en-US';
+      } else {
+        recognition.lang = (typeof mapMicLang === 'function') ? mapMicLang(micLangSel.value) : micLangSel.value;
+      }
       recognition.start();
     } catch (e) {
       console.error(e);
@@ -443,6 +449,7 @@
     micStartBtn.addEventListener('click', startMic);
     micStopBtn.addEventListener('click', stopMic);
     micLangSel.addEventListener('change', () => {
+      micFallbackRoman = false;
       if (isRecognizing) {
         stopMic();
         setTimeout(startMic, 150);
@@ -451,7 +458,7 @@
 
     recognition.onstart = () => {
       isRecognizing = true;
-      micStatus.textContent = 'Escuchando…';
+      micStatus.textContent = micFallbackRoman ? 'Escuchando (roman urdu)…' : 'Escuchando…';
       micStartBtn.disabled = true;
       micStopBtn.disabled = false;
     };
@@ -465,9 +472,32 @@
 
     recognition.onerror = (ev) => {
       console.error('Speech error:', ev);
-      micStatus.textContent = ev?.error === 'not-allowed' ? 'Permiso denegado para micrófono.' : 'Error en reconocimiento de voz.';
+      const code = ev?.error;
+      if (code === 'not-allowed') {
+        micStatus.textContent = 'Permiso denegado para micrófono.';
+      } else if (code === 'audio-capture') {
+        micStatus.textContent = 'No se detecta micrófono.';
+      } else if (code === 'no-speech') {
+        micStatus.textContent = 'No se detectó voz.';
+      } else if (code === 'network') {
+        micStatus.textContent = 'Error de red del reconocimiento.';
+      } else if ((code === 'language-not-supported' || code === 'bad-grammar' || code === 'service-not-allowed') && micLangSel.value.startsWith('ur') && !micFallbackRoman) {
+        micStatus.textContent = 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.';
+        micFallbackRoman = true;
+        try {
+          stopMic();
+          recognition.lang = 'en-US';
+          setTimeout(startMic, 300);
+          return;
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        micStatus.textContent = 'Error en reconocimiento de voz.';
+      }
       micStartBtn.disabled = false;
       micStopBtn.disabled = true;
+      isRecognizing = false;
     };
 
     recognition.onresult = async (ev) => {

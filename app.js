@@ -404,7 +404,10 @@
   let recognition = null;
   let recogAvailable = false;
   let isRecognizing = false;
-  let micFallbackRoman = false;
+  let micFallbackActive = false;
+  let micFallbackIndex = 0;
+  const urduFallbackOrder = ['ur-PK', 'ur', 'ur-IN', 'fa-IR', 'ar-SA', 'en-US'];
+  let lastRecogLang = '';
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     recognition = new SR();
@@ -415,6 +418,7 @@
     // Mapeo de idioma para mayor compatibilidad (ur-PK → ur)
     function mapMicLang(lang) { return !lang ? 'ur' : (lang === 'ur-PK' ? 'ur' : lang); }
     recognition.lang = mapMicLang(micLangSel?.value) || 'ur';
+    lastRecogLang = recognition.lang;
   } else {
     micStatus.textContent = 'El reconocimiento de voz no está soportado en este navegador.';
     if (micStartBtn) micStartBtn.disabled = true;
@@ -423,11 +427,12 @@
   function startMic() {
     if (!recogAvailable || !recognition || isRecognizing) return;
     try {
-      if (micFallbackRoman) {
-        recognition.lang = 'en-US';
+      if (micFallbackActive) {
+        recognition.lang = urduFallbackOrder[micFallbackIndex] || 'ur';
       } else {
         recognition.lang = (typeof mapMicLang === 'function') ? mapMicLang(micLangSel.value) : micLangSel.value;
       }
+      lastRecogLang = recognition.lang;
       recognition.start();
     } catch (e) {
       console.error(e);
@@ -449,7 +454,8 @@
     micStartBtn.addEventListener('click', startMic);
     micStopBtn.addEventListener('click', stopMic);
     micLangSel.addEventListener('change', () => {
-      micFallbackRoman = false;
+      micFallbackActive = false;
+      micFallbackIndex = 0;
       if (isRecognizing) {
         stopMic();
         setTimeout(startMic, 150);
@@ -458,7 +464,10 @@
 
     recognition.onstart = () => {
       isRecognizing = true;
-      micStatus.textContent = micFallbackRoman ? 'Escuchando (roman urdu)…' : 'Escuchando…';
+      const msg = (micFallbackActive && urduFallbackOrder[micFallbackIndex] === 'en-US')
+        ? 'Escuchando (roman urdu)…'
+        : (micFallbackActive ? `Escuchando (fallback: ${urduFallbackOrder[micFallbackIndex]})…` : 'Escuchando…');
+      micStatus.textContent = msg;
       micStartBtn.disabled = true;
       micStopBtn.disabled = false;
     };
@@ -481,16 +490,32 @@
         micStatus.textContent = 'No se detectó voz.';
       } else if (code === 'network') {
         micStatus.textContent = 'Error de red del reconocimiento.';
-      } else if ((code === 'language-not-supported' || code === 'bad-grammar' || code === 'service-not-allowed') && micLangSel.value.startsWith('ur') && !micFallbackRoman) {
-        micStatus.textContent = 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.';
-        micFallbackRoman = true;
-        try {
-          stopMic();
-          recognition.lang = 'en-US';
-          setTimeout(startMic, 300);
-          return;
-        } catch (e) {
-          console.error(e);
+      } else if ((code === 'language-not-supported' || code === 'bad-grammar' || code === 'service-not-allowed') && micLangSel.value.startsWith('ur')) {
+        // Avanzar por fallbacks: ur-PK → ur → ur-IN → fa-IR → ar-SA → en-US
+        if (!micFallbackActive) {
+          micFallbackActive = true;
+          micFallbackIndex = 1; // siguiente tras seleccionado
+        } else if (micFallbackIndex < urduFallbackOrder.length - 1) {
+          micFallbackIndex++;
+        } else {
+          micFallbackActive = false;
+          micFallbackIndex = 0;
+          micStatus.textContent = 'Error en reconocimiento (sin fallback disponible).';
+        }
+        if (micFallbackActive) {
+          const nextLang = urduFallbackOrder[micFallbackIndex];
+          micStatus.textContent = nextLang === 'en-US'
+            ? 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.'
+            : `Reconocimiento urdú no disponible; probando fallback ${nextLang}.`;
+          try {
+            stopMic();
+            recognition.lang = nextLang;
+            lastRecogLang = nextLang;
+            setTimeout(startMic, 300);
+            return;
+          } catch (e) {
+            console.error(e);
+          }
         }
       } else {
         micStatus.textContent = 'Error en reconocimiento de voz.';
@@ -498,6 +523,10 @@
       micStartBtn.disabled = false;
       micStopBtn.disabled = true;
       isRecognizing = false;
+    };
+
+    recognition.onnomatch = () => {
+      micStatus.textContent = 'No se entendió la voz.';
     };
 
     recognition.onresult = async (ev) => {
@@ -514,7 +543,7 @@
         micStatus.textContent = 'Procesando…';
       }
       if (finalText) {
-        const lang = micLangSel.value;
+        const lang = recognition.lang || lastRecogLang || micLangSel.value;
         const clean = finalText.trim();
         if (lang.startsWith('ur')) {
           // Si el resultado viene en latino (roman urdu), transliterar a urdú

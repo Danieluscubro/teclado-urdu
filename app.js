@@ -294,7 +294,7 @@
 
     // Sincronizar idioma del micrófono con la dirección elegida
     if (micLangSel) {
-      micLangSel.value = urToEs ? 'ur-PK' : 'es-ES';
+      micLangSel.value = urToEs ? 'ur' : 'es-ES';
     }
   }
 
@@ -406,7 +406,7 @@
   let isRecognizing = false;
   let micFallbackActive = false;
   let micFallbackIndex = 0;
-  const urduFallbackOrder = ["ur-PK", "ur", "ur-IN", "fa-IR", "ar-SA", "en-US"];
+  const urduFallbackOrder = ["ur", "ur-IN", "fa-IR", "ar-SA", "en-US"];
   let lastRecogLang = null;
   // Añadimos control de reintentos para evitar bucles
   let micRestartCount = 0;
@@ -422,7 +422,7 @@
     recognition.continuous = true;
     recognition.maxAlternatives = 1;
     // Mapeo de idioma para mayor compatibilidad (ur-PK → ur)
-    function mapMicLang(lang) { return !lang ? 'ur' : (lang === 'ur-PK' ? 'ur' : lang); }
+    function mapMicLang(lang) { return !lang ? 'ur' : lang; }
     recognition.lang = mapMicLang(micLangSel?.value) || 'ur';
     lastRecogLang = recognition.lang;
   } else {
@@ -544,7 +544,7 @@
         micStatus.textContent = 'Error de red del reconocimiento. (código: network)';
         canRestart = true;
       } else if (code === 'language-not-supported' || code === 'service-not-allowed') {
-        // Avanzar por fallbacks: ur-PK → ur → ur-IN → fa-IR → ar-SA → en-US
+        // Avanzar por fallbacks: ur → ur-IN → fa-IR → ar-SA → en-US
         const curr = (recognition && recognition.lang) || lastRecogLang || (micLangSel && micLangSel.value) || 'ur';
         let idx = urduFallbackOrder.indexOf(curr);
         if (!micFallbackActive) {

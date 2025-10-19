@@ -411,6 +411,9 @@
   // Añadimos control de reintentos para evitar bucles
   let micRestartCount = 0;
   const micRestartLimit = 3;
+  // Declaramos flags de control del micrófono
+  let micUserRequestedStop = false;
+  let micAutoRestart = true;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
     recognition = new SR();

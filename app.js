@@ -533,7 +533,6 @@
         micStatus.textContent = 'Permiso denegado para micrófono. (código: not-allowed)';
         micStartBtn.disabled = false;
         micStopBtn.disabled = true;
-        // Evita auto-reintentos cuando hay denegación
         try { micAutoRestart = false; } catch (_) {}
       } else if (code === 'audio-capture') {
         micStatus.textContent = 'No se detecta micrófono. (código: audio-capture)';
@@ -545,8 +544,28 @@
         micStatus.textContent = 'Error de red del reconocimiento. (código: network)';
         canRestart = true;
       } else if (code === 'language-not-supported' || code === 'service-not-allowed') {
-        micStatus.textContent = `Servicio/idioma no disponible, intentando fallback… (código: ${code})`;
-        canRestart = true;
+        // Avanzar por fallbacks: ur-PK → ur → ur-IN → fa-IR → ar-SA → en-US
+        const curr = (recognition && recognition.lang) || lastRecogLang || (micLangSel && micLangSel.value) || 'ur';
+        let idx = urduFallbackOrder.indexOf(curr);
+        if (!micFallbackActive) {
+          micFallbackActive = true;
+          micFallbackIndex = (idx >= 0 ? idx + 1 : 1);
+        } else if (micFallbackIndex < urduFallbackOrder.length - 1) {
+          micFallbackIndex++;
+        } else {
+          micFallbackActive = false;
+          micFallbackIndex = 0;
+          micStatus.textContent = `Error en reconocimiento (sin fallback disponible). (código: ${code})`;
+        }
+        if (micFallbackActive) {
+          const nextLang = urduFallbackOrder[micFallbackIndex];
+          recognition.lang = nextLang;
+          lastRecogLang = nextLang;
+          micStatus.textContent = nextLang === 'en-US'
+            ? 'Reconocimiento urdú no disponible; usando roman urdu con transliteración.'
+            : `Reconocimiento urdú no disponible; probando fallback ${nextLang}.`;
+          canRestart = true;
+        }
       } else {
         micStatus.textContent = `Error en reconocimiento de voz. (código: ${code})`;
         canRestart = true;

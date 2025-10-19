@@ -510,6 +510,23 @@
     recognition.onerror = (ev) => {
       const code = ev && ev.error ? ev.error : 'desconocido';
       console.error('Speech error:', ev);
+      // Log enriquecido para facilitar diagnóstico
+      try {
+        const details = {
+          code,
+          type: ev && ev.type,
+          message: ev && ev.message,
+          lang: (recognition && recognition.lang) || lastRecogLang || (micLangSel && micLangSel.value),
+          userStop: micUserRequestedStop,
+          restartCount: micRestartCount,
+          fallbackActive: micFallbackActive,
+          fallbackLang: micFallbackActive ? urduFallbackOrder[micFallbackIndex] : ((recognition && recognition.lang) || lastRecogLang)
+        };
+        console.debug('Speech error details', details);
+        if (micStatus) {
+          micStatus.title = `Error: ${details.code} | lang: ${details.lang} | fallback: ${details.fallbackActive ? 'sí (' + details.fallbackLang + ')' : 'no'} | reintentos: ${details.restartCount}`;
+        }
+      } catch (_) {}
       let canRestart = false;
       // Mensajes detallados con código
       if (code === 'not-allowed') {
